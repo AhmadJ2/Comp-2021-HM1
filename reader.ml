@@ -1,12 +1,13 @@
-#use "pc.ml"
-open PC;;
+
+#use "pc.ml";;
+open PC
 exception X_not_yet_implemented;;
 exception X_this_should_not_happen;;
-
+  
 type number =
   | Fraction of int * int
   | Float of float;;
-
+  
 type sexpr =
   | Bool of bool
   | Nil
@@ -26,15 +27,21 @@ let rec sexpr_eq s1 s2 =
   | String(s1), String(s2) -> s1 = s2
   | Symbol(s1), Symbol(s2) -> s1 = s2
   | Pair(car1, cdr1), Pair(car2, cdr2) -> (sexpr_eq car1 car2) && (sexpr_eq cdr1 cdr2);;
-
+  
+module Reader: sig
+  val read_sexprs : string -> sexpr list
+end
+= struct
 let normalize_scheme_symbol str =
   let s = string_to_list str in
   if (andmap
-        (fun ch -> (ch = (lowercase_ascii ch)))
-        s) then str
+	(fun ch -> (ch = (lowercase_ascii ch)))
+	s) then str
   else Printf.sprintf "|%s|" str;;
 
-let read_sexprs string = raise X_not_yet_implemented;;
+
+
+  
 
 (** TOKENS --- TOKENS --- TOKENS --- TOKENS --- TOKENS --- TOKENS --- TOKENS --- TOKENS --- TOKENS --- **)
 
@@ -113,6 +120,8 @@ let nt_float  =
   pack (make_spaced(caten (caten (nt_integer) (char '.') ) (nt_natural)))
     (fun ((s, e), r) -> s@[e]@r);;
 
+
+
 let nt_fracture =
   pack (make_spaced(caten (caten (nt_integer) (char '/') ) (nt_natural)))
     (fun ((s, e), r) -> s@[e]@r);;
@@ -138,6 +147,10 @@ let nt_specialchar = disj_l ['!';'$';'^';'*';'-';'_';'+';'=';'<';'>';'?';'/';':'
 let nt_symbolcharnodot = disj (nt_specialchar) (disj (digit) (range_ci 'a' 'z'));;
 
 let nt_symbolchar = disj (nt_symbolcharnodot) (nt_dot);;
+
+let nt_symbol = disj
+(**First parser*)(pack (caten (nt_symbolchar) (plus nt_symbolchar)) (fun (s,e)->s::e))
+(**Second parser*)(pack (nt_symbolcharnodot)((fun s->[s])))
 
 let nt_disj_nt_list l= 
   List.fold_right
@@ -175,7 +188,9 @@ and nt_stringR s =
 and nt_numberR s = let nt_l = [
     pack (nt_numberE) (fun s-> Number(Float(float_of_string(list_to_string s))));
     pack (nt_float) (fun s-> Number(Float(float_of_string (list_to_string s))));
-    pack (caten (caten (nt_integer) (char '/')) (nt_natural)) (fun ((s,e),r)-> Number(Fraction(int_of_string (list_to_string s),int_of_string (list_to_string s))));
+    pack (caten (caten (nt_integer) (char '/')) (nt_natural)) (fun ((s,e),r)->
+        let (num, denom) = do_gcd (int_of_string (list_to_string s)) (int_of_string (list_to_string r)) in
+            Number(Fraction(num,denom)));
     pack (nt_integer) (fun s-> Number(Fraction(int_of_string (list_to_string s),1)))] in
   nt_disj_nt_list nt_l s
 
@@ -195,8 +210,7 @@ and nt_charR s = let nt_l = [
   pack (caten (word "#\\") (nt_disj_nt_list nt_l)) (fun (e,s)-> s) s
 
 and nt_symbolR s = let nt_l = [
-    pack (caten(nt_symbolchar) (plus (nt_symbolchar))) (fun (s,r)-> Symbol(list_to_string (s::r)));
-    pack (nt_symbolcharnodot) (fun s -> Symbol(Printf.sprintf "%c" s))] in
+    pack (nt_symbol) (fun s -> Symbol(list_to_string s))] in
   nt_disj_nt_list nt_l s 
 
 and nt_list s = let packed = (
@@ -232,5 +246,13 @@ and nt_comment s = pack (caten (caten (char ';') (star (const (fun ch -> ch!='\n
 and nt_newline s = pack (caten (plus (char '\n')) (maybe nt_sexpr)) ((fun (s,e)->match e with | None -> Nil | Some r -> r)) s
 
 
-and nt_exprR s = nt_sexpr s ;;
+and nt_exprR s = make_spaced (star nt_sexpr) s ;;
+
+
+let read_sexprs string =  let (ret,tail) = nt_exprR (string_to_list (string))
+    in match tail with | [] -> ret | _ -> raise X_no_match ;;
+
+end;;
+
+
 

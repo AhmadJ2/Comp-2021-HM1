@@ -187,4 +187,3 @@ let test_string nt str =
 end;; (* end of struct PC *)
 
 (* end-of-input *)
-List.map((fun ch -> ch!='\n')) (string_to_list "; assa \n a");;
