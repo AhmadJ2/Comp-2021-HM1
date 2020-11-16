@@ -223,7 +223,6 @@ let rec sexpr_eq s1 s2 =
   | Pair(car1, cdr1), Pair(car2, cdr2) -> (sexpr_eq car1 car2) && (sexpr_eq cdr1 cdr2)
   |_ -> raise X_no_match;;
 
-  
 module Reader: sig
   val read_sexprs : string -> sexpr list
 end
@@ -294,7 +293,6 @@ let do_gcd a b =
   let x = gcd a b in
     (a/x, b/x);;
 
-
 let tenEx num ex = 
   let rec pow a = function
     | 0 -> 1.
@@ -307,9 +305,22 @@ let tenEx num ex =
 
 (* -------------------------------------------------------------------------------------------------------- *)
 
+let nt_natural =
+  let digits = plus digit in
+    pack digits (fun (ds) -> ds);;
 
+let sign = maybe (fun s -> 
+  match s with
+  | []-> raise X_no_match
+  | car::cdr ->  if (car = '+') || (car = '-') 
+      then (car, cdr) 
+        else raise X_no_match);;
 
-(* let nt_numberE = pack (caten (caten (nt_number) (char_ci 'e')) (nt_integer)) (fun ((e,s),r)->e@(s::r));;  *)
+let integer = pack (caten sign nt_natural) (fun s ->
+  match s with
+  |(Some a, num) -> a::num
+  |((None, num)) -> num
+  );;
 
 let nt_boolt = make_spaced (word_ci "#t");;
 
@@ -356,6 +367,7 @@ let symLetters = range_ci 'a' 'z';;
 let symbolCharNoDot = disj (disj symNums symLetters) nt_specialchar;;
 let dot = (char '.');;
 let symChar = disj symbolCharNoDot dot;;
+
 
 
   (* ----------------  number -----------------*)
@@ -409,9 +421,12 @@ let number s =
       (sexp, rest)
 
 
+
 let charPrefix s = word "#\\" s;;
 
 let visiblesimplechar s = const (fun ch -> ch >' ') s;;
+
+
 
 let nt_namedChar s = 
   let (e,s) = disj_l ["newline"; "nul"; "page"; "return"; "space"; "tab"] word s in
@@ -424,6 +439,7 @@ let nt_namedChar s =
     |"space" -> (' ',s)
     |"tab" ->('\t', s)
     |e -> raise X_no_match;;
+
 
 
 let rec nt_expr s =
@@ -461,6 +477,7 @@ and nt_dotted_list s = let dotted = pack
               (fun ((l, exps),(d,(exp, r))) -> (List.fold_right((fun x acc -> Pair(x, acc)))) exps exp 
               )
               in dotted s
+
 and nt_all_quotes s = let (quete,sexp) = match s with
       | '\''::rest -> ("quote",rest)
       | '`'::rest -> ("quasiquote",rest)
@@ -471,6 +488,7 @@ and nt_all_quotes s = let (quete,sexp) = match s with
       |_ -> raise X_no_match 
       in let (s,r) = nt_sexpr sexp in 
       (Pair(Symbol(quete), Pair(s, Nil)), r)
+
 
 
 and nt_sexpr s =  let nt_l = [
