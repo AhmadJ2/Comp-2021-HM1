@@ -311,6 +311,7 @@ let disj_l l nt=
     (fun x acc -> disj (nt x) (acc)) 
     l 
     nt_none;;
+let dot = make_spaced (char ('.'));;
 
 let nt_namedchar =
   disj_l ["#\\newline"; "#\\nul"; "#\\page"; "#\\return"; "#\\space"; "#\\tab"] word;;
@@ -407,8 +408,17 @@ and nt_dottedlist s = let car = pack (caten (caten (caten (caten(tok_lparen)(plu
                              folder sep se) in
   car s
 
-and nt_quote s = pack (caten (nt_disj_nt_list[word ("\039"); word ("`"); word "@"; word ",@"])(nt_sexpr))
-(fun (s,e)->Pair(Symbol(list_to_string s), Pair(e,Nil))) s
+  and nt_quote s = pack (caten (nt_disj_nt_list[word ("\039");
+  word ("`");
+  word ",@";
+  word ",";])(nt_sexpr))
+(fun (s,e)->
+match s with
+| ['\039'] ->Pair(Symbol("quote"), Pair(e,Nil))
+| ['`'] ->Pair(Symbol("quasiquote"), Pair(e,Nil))  
+| [','; '@'] ->Pair(Symbol("unquote-splicing"), Pair(e,Nil))
+| [','] ->Pair(Symbol("unquote"), Pair(e,Nil))
+| _ -> raise X_no_match) s
 
 and nt_sexprcomment s = pack (caten (caten (word "#;") (nt_sexpr)) (maybe (nt_sexpr)))
   (fun ((s,e),r)-> match r with | None -> Nil | Some r -> r ) s

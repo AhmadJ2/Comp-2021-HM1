@@ -1,4 +1,3 @@
-
 #use "pc.ml";;
 open PC
 exception X_not_yet_implemented;;
@@ -38,12 +37,6 @@ let normalize_scheme_symbol str =
 	(fun ch -> (ch = (lowercase_ascii ch)))
 	s) then str
   else Printf.sprintf "|%s|" str;;
-
-
-
-  
-
-(** TOKENS --- TOKENS --- TOKENS --- TOKENS --- TOKENS --- TOKENS --- TOKENS --- TOKENS --- TOKENS --- **)
 
 let nt_whitespaces = star (char ' ');;
 
@@ -120,8 +113,6 @@ let nt_float  =
   pack (make_spaced(caten (caten (nt_integer) (char '.') ) (nt_natural)))
     (fun ((s, e), r) -> s@[e]@r);;
 
-
-
 let nt_fracture =
   pack (make_spaced(caten (caten (nt_integer) (char '/') ) (nt_natural)))
     (fun ((s, e), r) -> s@[e]@r);;
@@ -159,18 +150,6 @@ let nt_disj_nt_list l=
     nt_none;;
 
 let nt_number =  nt_disj_nt_list [nt_float; nt_fracture; nt_integer];;
-
-let nt_numberF s = 
-  let integers = make_spaced nt_integer in 
-  let naturals = make_spaced nt_natural in
-  let ((domi, slash), rest) = caten integers (char '/') s in
-  let (nomi, rest) = 
-      try (naturals rest)
-      with PC.X_no_match -> (['1'],rest) in
-  let (domi, nomi) = do_gcd (int_of_string (list_to_string domi)) (int_of_string (list_to_string nomi)) in
-  match rest with
-  |[] -> Fraction(domi, nomi)
-  |chars -> Float(float_of_string ((string_of_float ((float_of_int domi) /. (float_of_int nomi)))^list_to_string chars));;
 
 let nt_numberE = pack (caten (caten (nt_number) (char_ci 'e')) (nt_integer)) (fun ((e,s),r)->e@(s::r));; 
 
@@ -232,8 +211,17 @@ and nt_dottedlist s = let car = pack (caten (caten (caten (caten(tok_lparen)(plu
                              folder sep se) in
   car s
 
-and nt_quote s = pack (caten (nt_disj_nt_list[word ("\039"); word ("`"); word "@"; word ",@"])(nt_sexpr))
-(fun (s,e)->Pair(Symbol(list_to_string s), Pair(e,Nil))) s
+and nt_quote s = pack (caten (nt_disj_nt_list[word ("\039");
+                                              word ("`");
+                                              word ",@";
+                                              word ",";])(nt_sexpr))
+                            (fun (s,e)->
+                            match s with
+                            | ['\039'] ->Pair(Symbol("quote"), Pair(e,Nil))
+                            | ['`'] ->Pair(Symbol("quasiquote"), Pair(e,Nil))  
+                            | [','; '@'] ->Pair(Symbol("unquote-splicing"), Pair(e,Nil))
+                            | [','] ->Pair(Symbol("unquote"), Pair(e,Nil))
+                            | _ -> raise X_no_match) s
 
 and nt_sexprcomment s = pack (caten (caten (word "#;") (nt_sexpr)) (maybe (nt_sexpr)))
   (fun ((s,e),r)-> match r with | None -> Nil | Some r -> r ) s
@@ -241,18 +229,12 @@ and nt_sexprcomment s = pack (caten (caten (word "#;") (nt_sexpr)) (maybe (nt_se
 and nt_comment s = pack (caten (caten (char ';') (star (const (fun ch -> ch!='\n')))) 
   (maybe nt_sexpr))
   (fun ((s,e),r)-> match r with | None -> Nil | Some r -> r) s
-   (** **) 
 
 and nt_newline s = pack (caten (plus (char '\n')) (maybe nt_sexpr)) ((fun (s,e)->match e with | None -> Nil | Some r -> r)) s
 
-
 and nt_exprR s = make_spaced (star nt_sexpr) s ;;
-
 
 let read_sexprs string =  let (ret,tail) = nt_exprR (string_to_list (string))
     in match tail with | [] -> ret | _ -> raise X_no_match ;;
 
 end;;
-
-
-
