@@ -223,6 +223,7 @@ let rec sexpr_eq s1 s2 =
   | Pair(car1, cdr1), Pair(car2, cdr2) -> (sexpr_eq car1 car2) && (sexpr_eq cdr1 cdr2)
   |_ -> raise X_no_match;;
 
+  
 module Reader: sig
   val read_sexprs : string -> sexpr list
 end
@@ -293,6 +294,7 @@ let do_gcd a b =
   let x = gcd a b in
     (a/x, b/x);;
 
+
 let tenEx num ex = 
   let rec pow a = function
     | 0 -> 1.
@@ -305,22 +307,9 @@ let tenEx num ex =
 
 (* -------------------------------------------------------------------------------------------------------- *)
 
-let nt_natural =
-  let digits = plus digit in
-    pack digits (fun (ds) -> ds);;
 
-let sign = maybe (fun s -> 
-  match s with
-  | []-> raise X_no_match
-  | car::cdr ->  if (car = '+') || (car = '-') 
-      then (car, cdr) 
-        else raise X_no_match);;
 
-let integer = pack (caten sign nt_natural) (fun s ->
-  match s with
-  |(Some a, num) -> a::num
-  |((None, num)) -> num
-  );;
+(* let nt_numberE = pack (caten (caten (nt_number) (char_ci 'e')) (nt_integer)) (fun ((e,s),r)->e@(s::r));;  *)
 
 let nt_boolt = make_spaced (word_ci "#t");;
 
@@ -358,21 +347,18 @@ let nt_disj_nt_list l=
 (* ------------------------------------------------ Compilers ----------------------------------------------- *)
 
 
-
-
   (* ----------------  symbol -----------------*)
 let nt_specialchar = disj_l ['!';'$';'^';'*';'-';'_';'+';'=';'<';'>';'?';'/';':'] char;;
 let symNums = range '0' '9';;
 let symLetters = range_ci 'a' 'z';;
 let symbolCharNoDot = disj (disj symNums symLetters) nt_specialchar;;
-let dot = (char '.');;
+let dot =  char '.';;
 let symChar = disj symbolCharNoDot dot;;
-
 
 
   (* ----------------  number -----------------*)
 let natural =
-  let digits = make_spaced (plus digit) in
+  let digits =  plus digit in
   pack digits (fun (ds) -> ds);;
 
 let sign = maybe (fun s -> 
@@ -410,7 +396,7 @@ let number s =
       in
       let (scientific, rest) = maybe (char 'e') rest in
       let (exponent, rest) = match scientific with
-      |Some(e) -> integer rest
+      |Some(e) -> let  (expo, rest) = integer rest in (['e']@expo, rest)
       |None -> (['_'], rest) in
       let (sexp) = 
       disj exponent_float (fun (((domi, symb), nomi), exponent) -> match symb with
@@ -418,15 +404,12 @@ let number s =
       | '_' -> (Number(Fraction((int_of_string (list_to_string domi)), (int_of_string (list_to_string nomi)))))
       | '/' -> let(domi, nomi) = do_gcd (int_of_string (list_to_string domi)) (int_of_string (list_to_string nomi)) in (Number(Fraction(domi, nomi)))
       | _-> raise X_no_match) (((domi, symb), nomi), exponent) in
-      (sexp, rest)
-
+      (sexp, rest);;
 
 
 let charPrefix s = word "#\\" s;;
 
 let visiblesimplechar s = const (fun ch -> ch >' ') s;;
-
-
 
 let nt_namedChar s = 
   let (e,s) = disj_l ["newline"; "nul"; "page"; "return"; "space"; "tab"] word s in
@@ -439,7 +422,6 @@ let nt_namedChar s =
     |"space" -> (' ',s)
     |"tab" ->('\t', s)
     |e -> raise X_no_match;;
-
 
 
 let rec nt_expr s =
@@ -459,7 +441,7 @@ and nt_bool = disj (pack nt_boolt (fun _-> Bool(true)))
 and nt_char = pack (caten (caten charPrefix (disj visiblesimplechar nt_namedChar)) nt_whitespaces) 
       (fun ((pre, vis), spaces) -> Char(vis))
 
-and nt_number =  number
+and nt_number =  make_spaced number
 
 and nt_symbol =  disj (fun s -> let (sym,rest) = symbolCharNoDot s in
         (Symbol(list_to_string [sym]), rest)) (fun x ->
@@ -473,8 +455,10 @@ and nt_list s = let p = pack
                  in p s
 
 and nt_dotted_list s = let dotted = pack 
-      (caten (caten tok_lparen (plus nt_sexpr)) (caten dot (caten nt_sexpr tok_rparen)))
-              (fun ((l, exps),(d,(exp, r))) -> (List.fold_right((fun x acc -> Pair(x, acc)))) exps exp 
+      (
+        caten (caten tok_lparen (plus nt_sexpr)) (caten (caten (make_spaced dot) nt_sexpr) tok_rparen)
+      )
+              (fun ((l, exps),((d,exp), r)) -> (List.fold_right((fun x acc -> Pair(x, acc)))) exps exp 
               )
               in dotted s
 
@@ -490,7 +474,6 @@ and nt_all_quotes s = let (quete,sexp) = match s with
       (Pair(Symbol(quete), Pair(s, Nil)), r)
 
 
-
 and nt_sexpr s =  let nt_l = [
-  nt_number; nt_char;nt_string; nt_bool;nt_symbol;nt_list;nt_dotted_list] in
+  nt_number; nt_char;nt_string; nt_bool;nt_symbol;nt_list;nt_dotted_list;nt_all_quotes] in
   (make_spaced(nt_disj_nt_list nt_l)) s;;
