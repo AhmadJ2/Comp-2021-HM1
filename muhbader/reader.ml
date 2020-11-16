@@ -403,7 +403,6 @@ let number s =
       | _ -> raise X_no_match) (((domi, symb), nomi), exponent) in
       (sexp, rest);;
 
-
 let charPrefix s = word "#\\" s;;
 
 let visiblesimplechar s = const (fun ch -> ch >' ') s;;
@@ -420,9 +419,11 @@ let nt_namedChar s =
     |"tab" ->('\t', s)
     |e -> raise X_no_match;;
 
+
 let rec pairs lst = match lst with
     | [] -> Nil
     |first:: rst -> Pair(first, pairs rst);;
+
 
 let rec nt_expr s =
   let nt_nestedexp = pack (caten (caten tok_lparen nt_expr) tok_rparen)
@@ -461,7 +462,6 @@ and nt_dotted_list s = let dotted = pack
               (fun ((l, exps),((d,exp), r)) -> (List.fold_right((fun x acc -> Pair(x, acc)))) exps exp 
               )
               in dotted s
-
 and nt_all_quotes s = let (quete,sexp) = match s with
       | '\''::rest -> ("quote",rest)
       | '`'::rest -> ("quasiquote",rest)
@@ -483,6 +483,7 @@ and nt_comment s = let (_ ,s) = caten (char ';') (star (const (fun ch -> ch!='\n
 
       (* (maybe nt_sexpr))
       (fun ((s,e),r)-> match r with | None -> Nil | Some r -> r) s *)
+
 
 and nt_sexpr s =  let nt_l = [
   nt_number; nt_char;nt_string; nt_bool;nt_symbol;nt_list;nt_dotted_list;nt_all_quotes;nt_comment;nt_sexprcomment] in
