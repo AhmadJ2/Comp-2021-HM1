@@ -220,8 +220,8 @@ let rec sexpr_eq s1 s2 =
   | Char(c1), Char(c2) -> c1 = c2
   | String(s1), String(s2) -> s1 = s2
   | Symbol(s1), Symbol(s2) -> s1 = s2
-  | Pair(car1, cdr1), Pair(car2, cdr2) -> (sexpr_eq car1 car2) && (sexpr_eq cdr1 cdr2);;
-  
+  | Pair(car1, cdr1), Pair(car2, cdr2) -> (sexpr_eq car1 car2) && (sexpr_eq cdr1 cdr2)
+  |_ -> raise X_no_match;;
 
 module Reader: sig
   val read_sexprs : string -> sexpr list
@@ -292,9 +292,6 @@ let rec gcd a b =
 let do_gcd a b = 
   let x = gcd a b in
     (a/x, b/x);;
-
-
-
 
 let tenEx num ex = 
   let rec pow a = function
@@ -373,30 +370,62 @@ let symChar = disj symbolCharNoDot dot;;
 
 
 
-
   (* ----------------  number -----------------*)
-let number s = 
-    let integers = make_spaced integer in 
-    let naturals = make_spaced nt_natural in
-    let ((domi, symb), rest) = 
-      try (caten integers (char '/') s )
-      with PC.X_no_match -> (caten integers (fun s -> ('_', s)) s) (* an integer*)
-      in
-    let (nomi, rest) = 
-        try (naturals rest)
-        with PC.X_no_match -> (['1'],rest) in
-    let (domi, nomi) = do_gcd (int_of_string (list_to_string domi)) (int_of_string (list_to_string nomi)) in
-    match rest with
-      |[] -> (Number(Fraction(domi, nomi)),[])
-      |chars -> (Number(Float(float_of_string ((string_of_float ((float_of_int domi) /. (float_of_int nomi)))))),chars);;
+let natural =
+  let digits = make_spaced (plus digit) in
+  pack digits (fun (ds) -> ds);;
 
-let nt_float s = Float(float_of_string (list_to_string s));;
+let sign = maybe (fun s -> 
+  match s with
+  | []-> raise X_no_match
+  | car::cdr ->  if (car = '+') || (car = '-') 
+      then (car, cdr) 
+        else raise X_no_match);;
+
+let integer = pack (caten sign natural) (fun s ->
+  match s with
+  |(Some a, num) -> a::num
+  |((None, num)) -> num
+  );;
+
+let fraction = caten (caten integer (char '/')) natural;;
+
+let floats = caten (caten integer dot) natural;;
+
+let exponent_float (((domi, symb), nomi), expo) = match symb with
+      |'.' -> (match expo with |'e'::rest -> Number(Float(float_of_string (list_to_string (domi@symb::nomi@expo))))
+                               |_ -> raise X_no_match)
+      |'_' -> (match expo with  | 'e'::rest -> Number(Float(float_of_string (list_to_string (domi@expo))))
+                                |_ -> raise X_no_match)
+      |_-> raise X_no_match
+                                
+
+let number s = 
+    let (((domi, symb), nomi), rest) = 
+      try (fraction s)
+      with PC.X_no_match -> (
+        try (floats s)
+        with PC.X_no_match -> pack integer (fun x -> ((x, '_'), ['1'])) s
+      ) 
+      in
+      let (scientific, rest) = maybe (char 'e') rest in
+      let (exponent, rest) = match scientific with
+      |Some(e) -> integer rest
+      |None -> (['_'], rest) in
+      let (sexp) = 
+      disj exponent_float (fun (((domi, symb), nomi), exponent) -> match symb with
+      | '.' -> Number(Float(float_of_string (list_to_string (domi@symb::nomi))))
+      | '_' -> (Number(Fraction((int_of_string (list_to_string domi)), (int_of_string (list_to_string nomi)))))
+      | '/' -> let(domi, nomi) = do_gcd (int_of_string (list_to_string domi)) (int_of_string (list_to_string nomi)) in (Number(Fraction(domi, nomi)))
+      | _-> raise X_no_match) (((domi, symb), nomi), exponent) in
+      (sexp, rest)
+
+
 
 let charPrefix s = word "#\\" s;;
 
 let visiblesimplechar s = const (fun ch -> ch >' ') s;;
 
-(* let nt_namedChar = disj_l ["#\\newline"; "#\\nul"; "#\\page"; "#\\return"; "#\\space"; "#\\tab"] word;; *)
 
 
 let nt_namedChar s = 
@@ -412,14 +441,7 @@ let nt_namedChar s =
     |e -> raise X_no_match;;
 
 
-(* let nt_visibleSimpleChar s =  *)
-  (* let integers = make_spaced integer in 
-  let naturals = make_spaced nt_natural in
-  let ((domi, dot), rest) = caten integers (char '.') s in
-  let (nomi, rest) = naturals rest in
-  match rest with 
-  |[] -> Float(float_of_string (list_to_string (domi@[dot]@nomi)))
-  |chars -> Float();; *)
+
 let rec nt_expr s =
   let nt_nestedexp = pack (caten (caten tok_lparen nt_expr) tok_rparen)
       (fun ((l, e), r) -> e) in
@@ -455,6 +477,18 @@ and nt_dotted_list s = let dotted = pack
               (fun ((l, exps),(d,(exp, r))) -> (List.fold_right((fun x acc -> Pair(x, acc)))) exps exp 
               )
               in dotted s
+
+and nt_all_quotes s = let (quete,sexp) = match s with
+      | '\''::rest -> ("quote",rest)
+      | '`'::rest -> ("quasiquote",rest)
+      | ','::rest -> (match rest with 
+                        | '@'::rest_2 -> ("unquote-splicing",rest_2)
+                        |_ -> ("unquote",rest)
+                      )
+      |_ -> raise X_no_match 
+      in let (s,r) = nt_sexpr sexp in 
+      (Pair(Symbol(quete), Pair(s, Nil)), r)
+
 
 
 and nt_sexpr s =  let nt_l = [
