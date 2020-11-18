@@ -220,7 +220,7 @@ and nt_bool = disj (pack nt_boolt (fun _-> Bool(true)))
   (pack nt_boolf (fun _-> Bool(false)))
 and nt_char = pack (caten (caten charPrefix (disj visiblesimplechar nt_namedChar)) nt_whitespaces) 
       (fun ((pre, vis), spaces) -> Char(vis))
-and nt_number =  not_followed number (disj symLetters nt_specialchar)
+and nt_number =  not_followed_by number (disj symLetters nt_specialchar)
 and nt_symbol =  disj (fun x ->
   let ((sym,slst), rest) = caten symChar (plus symChar) x in
   (Symbol(list_to_string (sym::slst)), rest)) 
