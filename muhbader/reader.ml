@@ -220,7 +220,7 @@ and nt_bool = disj (pack nt_boolt (fun _-> Bool(true)))
   (pack nt_boolf (fun _-> Bool(false)))
 and nt_char = pack (caten (caten charPrefix (disj visiblesimplechar nt_namedChar)) nt_whitespaces) 
       (fun ((pre, vis), spaces) -> Char(vis))
-and nt_number =  not_followed number (disj symLetters nt_specialchar)
+and nt_number =  not_followed_by number (disj symLetters nt_specialchar)
 and nt_symbol =  disj (fun x ->
   let ((sym,slst), rest) = caten symChar (plus symChar) x in
   (Symbol(list_to_string (sym::slst)), rest)) 
@@ -257,5 +257,10 @@ and nt_sexpr s =  let nt_l = [
   nt_number; nt_char;nt_string; nt_bool;nt_symbol;nt_list;nt_dotted_list;nt_all_quotes;nt_comment;nt_sexprcomment] in
   (make_spaced(nt_disj_nt_list nt_l)) s;;
 
-let read_sexprs string = let (sexp, lst) = plus nt_sexpr (string_to_list string) in sexp;;
+let read_sexprs string = let (sexp, lst) = star nt_sexpr (string_to_list string) in 
+<<<<<<< HEAD
+          match lst with | [] -> sexp | _ -> raise X_no_match ;;
+=======
+          match lst with | [] -> ret | _ -> raise X_no_match ;;
+>>>>>>> 05c58a4978d82288fd8206e6217b5ed7b9d8fdaa
 end;; (* struct Reader *)
