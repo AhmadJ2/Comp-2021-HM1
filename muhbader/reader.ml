@@ -258,9 +258,5 @@ and nt_sexpr s =  let nt_l = [
   (make_spaced(nt_disj_nt_list nt_l)) s;;
 
 let read_sexprs string = let (sexp, lst) = star nt_sexpr (string_to_list string) in 
-<<<<<<< HEAD
           match lst with | [] -> sexp | _ -> raise X_no_match ;;
-=======
-          match lst with | [] -> ret | _ -> raise X_no_match ;;
->>>>>>> 05c58a4978d82288fd8206e6217b5ed7b9d8fdaa
 end;; (* struct Reader *)
