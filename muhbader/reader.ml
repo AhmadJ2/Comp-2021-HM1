@@ -257,5 +257,6 @@ and nt_sexpr s =  let nt_l = [
   nt_number; nt_char;nt_string; nt_bool;nt_symbol;nt_list;nt_dotted_list;nt_all_quotes;nt_comment;nt_sexprcomment] in
   (make_spaced(nt_disj_nt_list nt_l)) s;;
 
-let read_sexprs string = let (sexp, lst) = plus nt_sexpr (string_to_list string) in sexp;;
+let read_sexprs string = let (sexp, lst) = star nt_sexpr (string_to_list string) in 
+          match lst with | [] -> sexp | _ -> raise X_no_match ;;
 end;; (* struct Reader *)
